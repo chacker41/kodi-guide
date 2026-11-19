@@ -8,13 +8,28 @@ permissions:
 jobs:
   build:
     runs-on: ubuntu-latest
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+      - name: Get iptv-org's grabber
+        run: git clone -q --depth 1 https://github.com/iptv-org/epg.git epg && cd epg && npm ci --no-audit --no-fund --loglevel=error
+      - name: Which channels no public guide has
+        run: python build_guide.py plan
+        env:
+          EPG_DIR: epg
+      - name: Grab them with iptv-org/epg (a site that fails only leaves its channels out)
+        continue-on-error: true
+        timeout-minutes: 40
+        run: cd epg && npm run grab --- --channels=../grab.channels.xml --output=../grabbed.xml --days=2 --maxConnections=4 --timeout=20000
       - run: python build_guide.py
         env:
+          GRABBED: grabbed.xml
           GUIDE_URL: https://raw.githubusercontent.com/${{ github.repository }}/output/guide.xml.gz
       - name: Publish to the output branch (replaced each day, so the repository stays small)
         run: |

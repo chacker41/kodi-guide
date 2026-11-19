@@ -1,3 +1,6 @@
 out/
 cache/
+epg/
+grab.channels.xml
+grabbed.xml
 __pycache__/
