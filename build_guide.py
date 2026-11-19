@@ -7,7 +7,7 @@ public XMLTV guides: first by iptv-org channel id, then by channel name. Writes,
   report.txt    how many channels have listings, from which source
 Standard library only. Run daily (GitHub Actions: .github/workflows/guide.yml).
 """
-import gzip, io, os, re, sys, time, urllib.request, xml.etree.ElementTree as ET
+import gzip, io, os, re, urllib.request, xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 
 PLAYLIST = "https://iptv-org.github.io/iptv/regions/amer.m3u"
@@ -34,9 +34,11 @@ def norm(name):
     return re.sub(r"[^a-z0-9]", "", name)
 
 def xmltv_time(s):
-    return datetime.strptime(s[:14], "%Y%m%d%H%M%S").replace(tzinfo=timezone(timedelta(
-        hours=int(s[15:18] or 0), minutes=int(s[15] + s[18:20]) if len(s) > 19 else 0))) if len(s) > 14 else \
-        datetime.strptime(s[:14], "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
+    """'20261118210000 -0500' (or no offset, read as UTC) -> an aware datetime."""
+    s = s.strip()
+    if len(s) > 14:
+        return datetime.strptime(s, "%Y%m%d%H%M%S %z")
+    return datetime.strptime(s, "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
 
 def main():
     now = datetime.now(timezone.utc)
@@ -53,7 +55,7 @@ def main():
     for c in chans:
         by_name.setdefault(norm(c[1]), c[0])
 
-    found = {}            # playlist tvg-id -> (source label, source channel id)
+    claimed = set()       # playlist tvg-ids that already have a source (the first one wins)
     progs = {}            # playlist tvg-id -> [programme elements]
     report = []
     for label, url in SOURCES:
@@ -63,7 +65,7 @@ def main():
             report.append(f"{label}: unavailable ({e})"); continue
         here = {}         # source channel id -> playlist tvg-id
         n = 0
-        for ev, el in ET.iterparse(io.BytesIO(raw), events=("end",)):
+        for _, el in ET.iterparse(io.BytesIO(raw)):
             if el.tag == "channel":
                 sid = el.get("id", "")
                 base = sid.split("@")[0].lower()
@@ -73,8 +75,8 @@ def main():
                     for dn in el.findall("display-name"):
                         tid = by_name.get(norm(dn.text or ""))
                         if tid: break
-                if tid and tid not in found:
-                    found[tid] = (label, sid); here[sid] = tid
+                if tid and tid not in claimed:
+                    claimed.add(tid); here[sid] = tid
                 el.clear()
             elif el.tag == "programme":
                 tid = here.get(el.get("channel", ""))
