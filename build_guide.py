@@ -29,8 +29,9 @@ SOURCES = [   # best first: a channel takes the first source that has it
     ("Plex", "https://i.mjh.nz/Plex/us.xml.gz"),
     ("Roku", "https://i.mjh.nz/Roku/all.xml.gz"),
 ]
-# iptv-org/epg sites to grab the rest from, most complete for US channels first
-GRAB_SITES = ["tvtv.us", "tvpassport.com", "tvguide.com", "pluto.tv", "plex.tv", "ontvtonight.com", "watchyour.tv"]
+# iptv-org/epg sites to grab the rest from, in order of preference. tvtv.us maps the most US
+# channels but returned nothing to GitHub's runners (2026-11-19), so it is only a last resort.
+GRAB_SITES = ["tvpassport.com", "tvguide.com", "pluto.tv", "plex.tv", "ontvtonight.com", "watchyour.tv", "tvtv.us"]
 GUIDE_URL = os.environ.get("GUIDE_URL", "guide.xml.gz")
 BEFORE, AHEAD = timedelta(hours=2), timedelta(hours=36)
 UA = {"User-Agent": "kodi-guide-builder/1.0 (+https://github.com)"}
