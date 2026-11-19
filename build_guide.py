@@ -1,16 +1,19 @@
 """Builds a small TV guide for Kodi (IPTV Simple Client) that matches iptv-org's playlist.
 
-Reads iptv-org's Americas playlist, keeps the US channels, and finds each channel's listings in a few
-public XMLTV guides: first by iptv-org channel id, then by channel name. Writes, into out/:
+Reads iptv-org's Americas playlist, keeps the US channels in English (iptv-org's own language data),
+names each one as iptv-org's channel database does ("Court TV", not "Court TV (1080p)"), and finds
+its listings in a few public XMLTV guides: first by iptv-org channel id, then by name. Writes, into out/:
   us.m3u        the US channels, with url-tvg pointing at guide.xml.gz
   guide.xml.gz  their listings from 2 hours ago to 36 hours ahead, under the playlist's own tvg-ids
   report.txt    how many channels have listings, from which source
 Standard library only. Run daily (GitHub Actions: .github/workflows/guide.yml).
 """
-import gzip, io, os, re, urllib.request, xml.etree.ElementTree as ET
+import gzip, io, json, os, re, urllib.request, xml.etree.ElementTree as ET
 from datetime import datetime, timedelta, timezone
 
 PLAYLIST = "https://iptv-org.github.io/iptv/regions/amer.m3u"
+API = "https://iptv-org.github.io/api/"   # feeds.json (languages, feed names), channels.json (names)
+LANGUAGE = "eng"
 SOURCES = [   # best first: a channel takes the first source that has it
     ("iptv-epg.org", "https://iptv-epg.org/files/epg-us.xml.gz"),
     ("Pluto TV", "https://i.mjh.nz/PlutoTV/us.xml.gz"),
@@ -40,20 +43,37 @@ def xmltv_time(s):
         return datetime.strptime(s, "%Y%m%d%H%M%S %z")
     return datetime.strptime(s, "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
 
+def clean_name(tid, raw, feeds, channels):
+    """iptv-org's own name for the channel, plus the feed's name when it is not the main feed."""
+    ch, _, fd = tid.partition("@")
+    c, f = channels.get(ch), feeds.get((ch, fd))
+    if not c:
+        return re.sub(r"\s*(\(\d+p\)|\[[^]]*\])", "", raw).strip()   # not in the database: drop "(720p)", "[Geo-blocked]"
+    return c["name"] + (f" ({f['name']})" if f and not f.get("is_main") and f.get("name") else "")
+
+
 def main():
     now = datetime.now(timezone.utc)
     lo, hi = now - BEFORE, now + AHEAD
+    feeds = {(f["channel"], f["id"]): f for f in json.loads(fetch(API + "feeds.json"))}
+    channels = {c["id"]: c for c in json.loads(fetch(API + "channels.json"))}
     text = fetch(PLAYLIST).decode("utf-8", "replace").splitlines()
-    chans = []   # (tvg-id, name, extinf line, url)
+    chans = []   # (tvg-id, clean name, extinf line, url)
     for i, line in enumerate(text):
-        if line.startswith("#EXTINF") and i + 1 < len(text):
-            tid = (re.search(r'tvg-id="([^"]*)"', line) or [None, ""])[1]
-            if ".us@" in tid or tid.endswith(".us"):
-                chans.append((tid, line.rsplit(",", 1)[-1].strip(), line, text[i + 1].strip()))
+        if not line.startswith("#EXTINF") or i + 1 >= len(text):
+            continue
+        tid = (re.search(r'tvg-id="([^"]*)"', line) or [None, ""])[1]
+        ch, _, fd = tid.partition("@")
+        if not ch.endswith(".us") or LANGUAGE not in (feeds.get((ch, fd)) or {}).get("languages", []):
+            continue
+        name = clean_name(tid, line.rsplit(",", 1)[-1].strip(), feeds, channels)
+        extinf = re.sub(r' tvg-name="[^"]*"', "", line.rsplit(",", 1)[0]).replace("#EXTINF:-1", f'#EXTINF:-1 tvg-name="{name}"', 1)
+        chans.append((tid, name, extinf + "," + name, text[i + 1].strip()))
     by_base = {c[0].split("@")[0].lower(): c[0] for c in chans}
     by_name = {}
-    for c in chans:
-        by_name.setdefault(norm(c[1]), c[0])
+    for tid, name, *_ in chans:   # the clean name, then iptv-org's other names for the channel
+        for n in [name] + (channels.get(tid.split("@")[0]) or {}).get("alt_names", []):
+            by_name.setdefault(norm(n), tid)
 
     claimed = set()       # playlist tvg-ids that already have a source (the first one wins)
     progs = {}            # playlist tvg-id -> [programme elements]
@@ -111,7 +131,7 @@ def main():
         for tid, name, extinf, url in chans:
             f.write(extinf + "\n" + url + "\n")
     with_listings = sum(1 for c in chans if c[0] in progs)
-    summary = [f"built {now:%Y-%m-%d %H:%M} UTC", f"US channels: {len(chans)}, with listings: {with_listings} ({with_listings * 100 // max(1, len(chans))}%)"] + report
+    summary = [f"built {now:%Y-%m-%d %H:%M} UTC", f"US English channels: {len(chans)}, with listings: {with_listings} ({with_listings * 100 // max(1, len(chans))}%)"] + report
     open("out/report.txt", "w").write("\n".join(summary) + "\n")
     print("\n".join(summary))
 

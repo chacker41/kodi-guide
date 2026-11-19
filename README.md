@@ -2,7 +2,8 @@
 
 A daily TV guide for Kodi's IPTV Simple Client, matched to iptv-org's US channels.
 
-`build_guide.py` reads iptv-org's Americas playlist, keeps the US channels, and takes each
+`build_guide.py` reads iptv-org's Americas playlist, keeps the US channels in English (iptv-org's
+language data), names them from iptv-org's channel database, and takes each
 channel's listings from public XMLTV guides (iptv-epg.org, then i.mjh.nz's Pluto TV, Samsung TV
 Plus, Plex and Roku guides), matched by iptv-org channel id and then by name. A GitHub Action
 runs it every morning and publishes to the `output` branch:
