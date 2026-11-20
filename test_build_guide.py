@@ -1,6 +1,6 @@
 """Checks for the guide builder: python3 test_build_guide.py"""
 from datetime import datetime, timedelta, timezone
-from build_guide import PLACEHOLDER, display_names, logo_candidates, norm, stream_lines, xmltv_time
+from build_guide import PLACEHOLDER, display_names, whitened, logo_candidates, norm, stream_lines, xmltv_time
 
 # placeholder listings are no listings
 assert all(PLACEHOLDER.fullmatch(s) for s in ("No Data", "Channel No Longer Available", "teleup-event_1679249810_2590"))
@@ -35,4 +35,21 @@ assert xmltv_time("20261118210000 +0530").utcoffset() == timedelta(hours=5, minu
 assert xmltv_time("20261118210000") == datetime(2026, 11, 18, 21, 0, tzinfo=timezone.utc)
 assert norm("ABC News Live (720p) [Geo-blocked]") == "abcnewslive"
 assert norm("CBS News HD") == "cbsnews"
+
+# a black logo on a see-through background comes back white; colour, or a solid square, is left alone
+try:
+    import io
+    from PIL import Image
+
+    def png(fill, see_through=True):
+        im = Image.new("RGBA", (40, 20), (0, 0, 0, 0) if see_through else (255, 255, 255, 255))
+        im.paste(Image.new("RGBA", (20, 10), fill), (10, 5))
+        b = io.BytesIO(); im.save(b, "PNG"); return b.getvalue()
+    w = whitened(png((0, 0, 0, 255)))
+    assert w and Image.open(io.BytesIO(w)).getpixel((15, 8)) == (255, 255, 255, 255)
+    assert Image.open(io.BytesIO(w)).getpixel((0, 0))[3] == 0
+    assert whitened(png((200, 30, 30, 255))) is None
+    assert whitened(png((0, 0, 0, 255), see_through=False)) is None
+except ImportError:
+    print("Pillow not installed: white logos not checked")
 print("ok")

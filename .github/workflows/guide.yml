@@ -14,6 +14,7 @@ jobs:
       - uses: actions/setup-python@v5
         with:
           python-version: "3.12"
+      - run: pip install -q pillow==13.0.0   # white copies of black logos
       - uses: actions/setup-node@v4
         with:
           node-version: "22"
@@ -31,6 +32,7 @@ jobs:
         env:
           GRABBED: grabbed.xml
           GUIDE_URL: https://raw.githubusercontent.com/${{ github.repository }}/output/guide.xml.gz
+          LOGO_BASE: https://raw.githubusercontent.com/${{ github.repository }}/output/logos/
       - name: Publish to the output branch (replaced each day, so the repository stays small)
         run: |
           cd out

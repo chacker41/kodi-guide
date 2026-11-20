@@ -13,7 +13,7 @@ iptv-org's own grabber fetched for the rest. Only channels with listings are kep
     guide.xml.gz  their listings from 2 hours ago to 36 hours ahead, under the playlist's own tvg-ids
     report.txt    how many channels have listings, from which source
                                 (GRABBED: the grabber's guide.xml, read as one more source)
-Standard library only. Run daily (GitHub Actions: .github/workflows/guide.yml).
+Standard library only, plus Pillow (optional) for white copies of black logos. Run daily (GitHub Actions: .github/workflows/guide.yml).
 """
 import glob, gzip, io, json, os, re, sys, time, urllib.error, urllib.request, xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
@@ -35,6 +35,8 @@ SOURCES = [   # best first: a channel takes the first source that has it
 # channels but returned nothing to GitHub's runners (2026-11-19), so it is only a last resort.
 GRAB_SITES = ["tvpassport.com", "tvguide.com", "pluto.tv", "plex.tv", "ontvtonight.com", "watchyour.tv", "tvtv.us"]
 GUIDE_URL = os.environ.get("GUIDE_URL", "guide.xml.gz")
+LOGO_BASE = os.environ.get("LOGO_BASE", "logos/")   # where out/logos is published (white copies of black logos)
+DARK_LOGO = 30   # average brightness (0-255) of a logo's drawn pixels below which it is made white
 BEFORE, AHEAD = timedelta(hours=2), timedelta(hours=36)
 UA = {"User-Agent": "kodi-guide-builder/1.0 (+https://github.com)"}
 # listings that are only a placeholder: "No Data", "Channel No Longer Available", "teleup-event_1679249810_2590"
@@ -112,32 +114,69 @@ def logo_candidates(tid, logos):
     return [(u, rank[2]) for rank, u in sorted(found, key=lambda x: x[0], reverse=True)]
 
 
-def image_loads(url, tries=3):
-    """True when url answers with an image (a deleted imgur picture answers with its removed.png).
-    Wikimedia refuses bursts (429), so a refusal is tried again after a pause."""
+def image_bytes(url, tries=3):
+    """The picture at url, or None when it does not answer with one (a deleted imgur picture answers
+    with its removed.png). Wikimedia refuses bursts (429), so a refusal is tried again after a pause."""
     for n in range(tries):
         try:
             with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=20) as r:
-                return r.headers.get_content_type().startswith("image/") and "removed" not in r.geturl()
+                ok = r.headers.get_content_type().startswith("image/") and "removed" not in r.geturl()
+                return r.read() if ok else None
         except urllib.error.HTTPError as e:
             if e.code not in (429, 503):
-                return False
+                return None
         except Exception:
             pass
         time.sleep(2 * (n + 1))
-    return False
+    return None
+
+
+def whitened(data):
+    """A logo drawn in black on a see-through background (lost on Kodi's dark screens) as the same shape
+    in white, as YouTube TV shows such logos: PNG bytes, or None when the logo is not like that or
+    Pillow is not installed."""
+    try:
+        from PIL import Image
+        im = Image.open(io.BytesIO(data)).convert("RGBA")
+    except Exception:
+        return None
+    small = im.copy()
+    small.thumbnail((128, 128))
+    px = small.tobytes()
+    seen = [px[i:i + 3] for i in range(0, len(px), 4) if px[i + 3] > 128]
+    if not seen or len(seen) > 0.9 * (len(px) // 4):   # nothing drawn, or no see-through background
+        return None
+    if sum(0.2126 * r + 0.7152 * g + 0.0722 * b for r, g, b in seen) / len(seen) >= DARK_LOGO:
+        return None
+    white = Image.new("RGBA", im.size, (255, 255, 255, 0))
+    white.putalpha(im.getchannel("A"))
+    out = io.BytesIO()
+    white.save(out, "PNG", optimize=True)
+    return out.getvalue()
 
 
 def pick_logos(kept, logos, icons):
     """The first logo that loads for each kept channel: iptv-org's, then the guides' icon, then the
-    playlist's own: {tvg-id: url or ""}."""
+    playlist's own; a black one as its white copy in out/logos: {tvg-id: url or ""}."""
+    os.makedirs("out/logos", exist_ok=True)
+
     def one(c):
         own = (re.search(r'tvg-logo="([^"]*)"', c[2]) or [None, ""])[1]
         found = logo_candidates(c[0], logos)
         urls = [u for u, _ in found]
         # a small catalog logo (an old upload) loses to the guide's own icon, which is usually large
         urls = [icons.get(c[0])] + urls if found and found[0][1] < 300 else urls + [icons.get(c[0])]
-        return c[0], next((u for u in urls + [own] if u and image_loads(u)), "")
+        for u in urls + [own]:
+            data = u and image_bytes(u)
+            if data:
+                white = whitened(data)
+                if not white:
+                    return c[0], u
+                name = re.sub(r"[^A-Za-z0-9.@-]", "_", c[0]) + ".png"
+                with open(os.path.join("out/logos", name), "wb") as f:
+                    f.write(white)
+                return c[0], LOGO_BASE + name
+        return c[0], ""
     with ThreadPoolExecutor(16) as ex:
         return dict(ex.map(one, kept))
 
