@@ -15,12 +15,14 @@ iptv-org's own grabber fetched for the rest. Only channels with listings are kep
                                 (GRABBED: the grabber's guide.xml, read as one more source)
 Standard library only. Run daily (GitHub Actions: .github/workflows/guide.yml).
 """
-import glob, gzip, io, json, os, re, sys, urllib.request, xml.etree.ElementTree as ET
+import glob, gzip, io, json, os, re, sys, time, urllib.error, urllib.request, xml.etree.ElementTree as ET
+from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from xml.sax.saxutils import escape, quoteattr
 
 PLAYLIST = "https://iptv-org.github.io/iptv/regions/amer.m3u"
-API = "https://iptv-org.github.io/api/"   # feeds.json (languages, feed names), channels.json (names)
+API = "https://iptv-org.github.io/api/"   # feeds.json (languages, feed names), channels.json (names), logos.json
+DEAD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dead_streams.txt")
 LANGUAGE = "eng"
 SOURCES = [   # best first: a channel takes the first source that has it
     ("iptv-epg.org", "https://iptv-epg.org/files/epg-us.xml.gz"),
@@ -59,21 +61,112 @@ def xmltv_time(s):
     return datetime.strptime(s, "%Y%m%d%H%M%S").replace(tzinfo=timezone.utc)
 
 
-def clean_name(tid, raw, feeds, channels):
-    """iptv-org's own name for the channel, plus the feed's name when it is not the main feed."""
+# casing iptv-org has wrong, as the networks write their own names
+FIX_NAME = {"bon appetit": "Bon Appétit", "ESPN 2": "ESPN2", "SPEEDVISION": "Speedvision"}
+
+
+def base_name(tid, raw, feeds, channels):
+    """iptv-org's own name for the channel and its feed: ('CNN', 'HD', is_main)."""
     ch, _, fd = tid.partition("@")
-    c, f = channels.get(ch), feeds.get((ch, fd))
-    if not c:
-        return re.sub(r"\s*(\(\d+p\)|\[[^]]*\])", "", raw).strip()   # not in the database: drop "(720p)", "[Geo-blocked]"
-    return c["name"] + (f" ({f['name']})" if f and not f.get("is_main") and f.get("name") else "")
+    c, f = channels.get(ch), feeds.get((ch, fd)) or {}
+    if not c:   # not in the database: drop "(720p)", "[Geo-blocked]"
+        return re.sub(r"\s*(\(\d+p\)|\[[^]]*\])", "", raw).strip(), "", True
+    name = FIX_NAME.get(c["name"], c["name"])
+    return name, ("" if f.get("is_main") else f.get("name") or ""), bool(f.get("is_main"))
+
+
+def display_names(entries):
+    """[(name, feed, is_main)] -> names as a TV service lists them, one entry per network: the brand alone
+    ("CNN", not "CNN (HD)"), a West feed as "TNT West" (its own, later schedule), and None for a second
+    feed of a channel already listed (the main feed is the one kept)."""
+    names = [n + " West" if q == "West" else n for n, q, _ in entries]
+    seen = set()
+    for i in sorted(range(len(entries)), key=lambda i: (not entries[i][2], i)):
+        if names[i] in seen:
+            names[i] = None
+        else:
+            seen.add(names[i])
+    return names
+
+
+def logo_candidates(tid, logos):
+    """iptv-org's logos for the channel that Kodi can draw, best first: no black or dark versions (lost on a
+    dark screen), transparent before JPEG, then the largest: [(url, width)]. A Wikimedia SVG comes as its 960 px PNG."""
+    ch, _, fd = tid.partition("@")
+    found = []
+    for l in logos.get(ch, []):
+        if l.get("feed") not in (None, fd):
+            continue
+        url, fmt, width = l["url"], l.get("format"), l.get("width") or 0
+        if fmt == "SVG":
+            m = re.match(r"https://upload\.wikimedia\.org/wikipedia/([\w-]+)/(\w)/(\w\w)/([^/]+\.svg)$", url)
+            if not m:
+                continue
+            url, width = f"https://upload.wikimedia.org/wikipedia/{m[1]}/thumb/{m[2]}/{m[3]}/{m[4]}/960px-{m[4]}.png", 960
+        elif fmt not in ("PNG", "WebP", "JPEG"):
+            continue
+        dark = bool(set(l.get("tags") or []) & {"black", "dark"})
+        found.append(((not dark, fmt != "JPEG", min(width, 1200), bool(l.get("in_use"))), url))
+    return [(u, rank[2]) for rank, u in sorted(found, key=lambda x: x[0], reverse=True)]
+
+
+def image_loads(url, tries=3):
+    """True when url answers with an image (a deleted imgur picture answers with its removed.png).
+    Wikimedia refuses bursts (429), so a refusal is tried again after a pause."""
+    for n in range(tries):
+        try:
+            with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=20) as r:
+                return r.headers.get_content_type().startswith("image/") and "removed" not in r.geturl()
+        except urllib.error.HTTPError as e:
+            if e.code not in (429, 503):
+                return False
+        except Exception:
+            pass
+        time.sleep(2 * (n + 1))
+    return False
+
+
+def pick_logos(kept, logos, icons):
+    """The first logo that loads for each kept channel: iptv-org's, then the guides' icon, then the
+    playlist's own: {tvg-id: url or ""}."""
+    def one(c):
+        own = (re.search(r'tvg-logo="([^"]*)"', c[2]) or [None, ""])[1]
+        found = logo_candidates(c[0], logos)
+        urls = [u for u, _ in found]
+        # a small catalog logo (an old upload) loses to the guide's own icon, which is usually large
+        urls = [icons.get(c[0])] + urls if found and found[0][1] < 300 else urls + [icons.get(c[0])]
+        return c[0], next((u for u in urls + [own] if u and image_loads(u)), "")
+    with ThreadPoolExecutor(16) as ex:
+        return dict(ex.map(one, kept))
+
+
+def dead_streams():
+    """Stream addresses found dead (not found, timed out, no such server), from dead_streams.txt."""
+    if not os.path.exists(DEAD):
+        return set()
+    return {l.split()[0] for l in open(DEAD, encoding="utf-8") if l.strip() and not l.startswith("#")}
+
+
+def stream_lines(text, i):
+    """The lines after the #EXTINF at text[i] up to its address: option lines (#EXTVLCOPT referrer or user
+    agent, #KODIPROP) kept above it, as IPTV Simple reads them. None when the entry has no address."""
+    opts = []
+    for line in (l.strip() for l in text[i + 1:]):
+        if line.startswith("#EXTINF"):
+            return None
+        if line.startswith(("#EXTVLCOPT", "#KODIPROP")):
+            opts.append(line)
+        elif line and not line.startswith("#"):
+            return "\n".join(opts + [line])
+    return None
 
 
 def load_channels():
-    """The playlist's US English channels: [(tvg-id, clean name, extinf line, url)], and lookups by id and name."""
+    """The playlist's US English channels (not the dead ones), and lookups by id and name."""
     feeds = {(f["channel"], f["id"]): f for f in json.loads(fetch(API + "feeds.json"))}
     channels = {c["id"]: c for c in json.loads(fetch(API + "channels.json"))}
     text = fetch(PLAYLIST).decode("utf-8", "replace").splitlines()
-    chans = []
+    dead, found = dead_streams(), []
     for i, line in enumerate(text):
         if not line.startswith("#EXTINF") or i + 1 >= len(text):
             continue
@@ -81,20 +174,25 @@ def load_channels():
         ch, _, fd = tid.partition("@")
         if not ch.endswith(".us") or LANGUAGE not in (feeds.get((ch, fd)) or {}).get("languages", []):
             continue
-        name = clean_name(tid, line.rsplit(",", 1)[-1].strip(), feeds, channels)
-        extinf = re.sub(r' tvg-name="[^"]*"', "", line.rsplit(",", 1)[0]).replace("#EXTINF:-1", f'#EXTINF:-1 tvg-name="{name}"', 1)
-        chans.append((tid, name, extinf + "," + name, text[i + 1].strip()))
+        url = stream_lines(text, i)
+        if url and url.splitlines()[-1] not in dead:
+            found.append((tid, base_name(tid, line.rsplit(",", 1)[-1].strip(), feeds, channels), line.rsplit(",", 1)[0], url))
+    # (tvg-id, iptv-org's name, the #EXTINF up to its title, address lines, (name, feed, is main));
+    # the names the viewer sees are settled once the kept channels are known (write_outputs)
+    chans = [(tid, base[0], head, url, base) for tid, base, head, url in found]
     by_base = {c[0].split("@")[0].lower(): c[0] for c in chans}
     by_name = {}
     for tid, name, *_ in chans:   # the clean name, then iptv-org's other names for the channel
-        for n in [name] + (channels.get(tid.split("@")[0]) or {}).get("alt_names", []):
+        c = channels.get(tid.split("@")[0]) or {}
+        for n in [name, c.get("name", "")] + c.get("alt_names", []):
             by_name.setdefault(norm(n), tid)
     return chans, by_base, by_name
 
 
 def read_guides(sources, by_base, by_name, lo, hi):
-    """Listings per playlist tvg-id from each (label, raw XMLTV bytes or None) in turn; and a report."""
-    claimed, progs, report = set(), {}, []
+    """Listings per playlist tvg-id from each (label, raw XMLTV bytes or None) in turn; a report; and each
+    channel's icon in those guides (a logo of last resort)."""
+    claimed, progs, report, icons = set(), {}, [], {}
     for label, raw in sources:
         if raw is None:
             report.append(f"{label}: unavailable")
@@ -111,6 +209,9 @@ def read_guides(sources, by_base, by_name, lo, hi):
                 if tid and tid not in claimed:
                     claimed.add(tid)
                     here[sid] = tid
+                icon = el.find("icon")
+                if tid and icon is not None and icon.get("src"):
+                    icons.setdefault(tid, icon.get("src"))
                 el.clear()
                 continue
             if el.tag != "programme":
@@ -130,7 +231,7 @@ def read_guides(sources, by_base, by_name, lo, hi):
             progs.setdefault(tid, []).append(el)
             n += 1
         report.append(f"{label}: {len(here)} channels, {n} listings")
-    return progs, report
+    return progs, report, icons
 
 
 def public_sources():
@@ -165,8 +266,24 @@ def plan(chans, progs):
     print(f"grab.channels.xml: {len(lines)} channels for iptv-org/epg")
 
 
-def write_outputs(chans, progs, report, now):
+def entry(head, name, logo):
+    """The #EXTINF line with the viewer's name and the chosen logo."""
+    head = re.sub(r' tvg-(name|logo)="[^"]*"', "", head)
+    return head.replace("#EXTINF:-1", f'#EXTINF:-1 tvg-name="{name}" tvg-logo="{logo}"', 1) + "," + name
+
+
+def logos_by_channel():
+    by = {}
+    for l in json.loads(fetch(API + "logos.json")):
+        by.setdefault(l["channel"], []).append(l)
+    return by
+
+
+def write_outputs(chans, progs, report, now, icons):
     kept = [c for c in chans if c[0] in progs]   # a channel with no listings anywhere is left out
+    kept = [c[:4] + (name,) for c, name in zip(kept, display_names([c[4] for c in kept])) if name]
+    logos = pick_logos(kept, logos_by_channel(), icons)
+    kept = [(tid, name, entry(head, name, logos[tid]), url) for tid, _, head, url, name in kept]
     tv = ET.Element("tv", {"generator-info-name": "kodi-guide-builder"})
     for tid, name, *_ in kept:
         ET.SubElement(ET.SubElement(tv, "channel", {"id": tid}), "display-name").text = name
@@ -179,7 +296,8 @@ def write_outputs(chans, progs, report, now):
     with open("out/us.m3u", "w", encoding="utf-8") as f:
         f.write(f'#EXTM3U url-tvg="{GUIDE_URL}"\n' + "".join(extinf + "\n" + url + "\n" for _, _, extinf, url in kept))
     summary = [f"built {now:%Y-%m-%d %H:%M} UTC",
-               f"US English channels: {len(chans)}, with listings (kept): {len(kept)}, left out: {len(chans) - len(kept)}"] + report
+               f"US English channels: {len(chans)}, with listings (kept): {len(kept)}, left out: {len(chans) - len(kept)}",
+               f"logos: {sum(1 for t in logos.values() if t)} of {len(kept)}"] + report
     with open("out/report.txt", "w") as f:
         f.write("\n".join(summary) + "\n")
     print("\n".join(summary))
@@ -193,11 +311,11 @@ def main():
     if grabbed and os.path.exists(grabbed):
         with open(grabbed, "rb") as f:
             sources.append(("iptv-org/epg grab", f.read()))
-    progs, report = read_guides(sources, by_base, by_name, now - BEFORE, now + AHEAD)
+    progs, report, icons = read_guides(sources, by_base, by_name, now - BEFORE, now + AHEAD)
     if sys.argv[1:] == ["plan"]:
         plan(chans, progs)
     else:
-        write_outputs(chans, progs, report, now)
+        write_outputs(chans, progs, report, now, icons)
 
 
 if __name__ == "__main__":

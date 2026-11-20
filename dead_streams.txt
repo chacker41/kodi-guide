@@ -1,0 +1,72 @@
+# Stream addresses left out of us.m3u: found dead from a home connection (playlist -> a video segment).
+# One per line: address, then a comment. A channel whose address changes upstream comes back by itself.
+# Checked 2026-11-20; only 'not found', 'timed out' and 'no such server' are listed (not 403/502/503).
+http://41.205.93.154/AMC/index.m3u8  # AMC: not found
+https://amg00145-fremantlemedian-baywatch-samsungau-gtsd6.amagi.tv/playlist/amg00145-fremantlemedian-baywatch-samsungau/playlist.m3u8  # Baywatch: no such server
+https://linear-701.frequency.stream/dist/stirr/701/hls/master/playlist.m3u8  # CBS (WWMT): not found
+https://cbsn-sf.cbsnstream.cbsnews.com/out/v1/dac63c1abb3f4a2dac9f508f44bb072a/master.m3u8  # CBS News Bay Area: not found
+https://cbsn-bos.cbsnstream.cbsnews.com/out/v1/589d66ec6eb8434c96c28de0370d1326/master.m3u8  # CBS News Boston: not found
+https://cbsn-chi.cbsnstream.cbsnews.com/out/v1/b2fc0d5715d54908adf07f97d2616646/master.m3u8  # CBS News Chicago: not found
+https://cbsn-den.cbsnstream.cbsnews.com/out/v1/2e49baf2906244ecb01b07d9885fbe7a/master.m3u8  # CBS News Colorado: not found
+https://cbsn-det.cbsnstream.cbsnews.com/out/v1/169f5c001bc74fa7a179b19c20fea069/master.m3u8  # CBS News Detroit: not found
+https://cbsn-la.cbsnstream.cbsnews.com/out/v1/57b6c4534a164accb6b1872b501e0028/master.m3u8  # CBS News Los Angeles: not found
+https://cbsn-min.cbsnstream.cbsnews.com/out/v1/76518f06941246ba810c8d175600bf74/master.m3u8  # CBS News Minnesota: not found
+https://cbsn-ny.cbsnstream.cbsnews.com/out/v1/ec3897d58a9b45129a77d67aa247d136/master.m3u8  # CBS News New York: not found
+https://cbsn-phi.cbsnstream.cbsnews.com/out/v1/5c9ad3e215984b0e9ad845b335216b72/master.m3u8  # CBS News Philly: not found
+https://cbsn-pit.cbsnstream.cbsnews.com/out/v1/6966dabf8150405ab26f854e3cd6a2b8/master.m3u8  # CBS News Pittsburgh: not found
+https://aegis-cloudfront-1.tubi.video/ea1ab5d1-f554-4f6b-b03f-2611fcd94257/playlist.m3u8  # Cinevault 80s: not found
+http://41.205.93.154/CNBC/index.m3u8  # CNBC: not found
+https://jmp2.uk/plu-6868152657543d1f8be4ece3.m3u8  # Concert Channel: not found
+https://langleyproductions-cops-2-eu.rakuten.wurl.tv/playlist.m3u8  # Cops: no such server
+http://tvsen5.aynascope.net/disney/index.m3u8  # Disney Junior: timed out
+https://1d153317c8db4250b3789601274e2402.mediatailor.us-west-2.amazonaws.com/v1/master/ba62fe743df0fe93366eba3a257d792884136c7f/LINEAR-887-DOCUMENTARYINTERNATIONAL-DOCUMENTARYPLUS/mt/documentaryplus/887/hls/master/playlist.m3u8  # Documentary+ (International): not found
+https://xumo-xumoent-vc-117-a3ga4.fast.nbcuni.com/live/master.m3u8  # E! Keeping Up: no such server
+http://23.237.104.106:8080/USA_FOX_DEPORTES/index.m3u8  # Fox Deportes: not found
+https://tvsen7.aynascope.net/foxsports2/index.m3u8  # Fox Sports 2: timed out
+https://tvsen7.aynascope.net/fx/index.m3u8  # FX: timed out
+https://aegis-cloudfront-1.tubi.video/c8364f36-c60b-4a39-8d86-0b92db4611c0/index.m3u8  # Gordon Ramsay's Hell's Kitchen: not found
+http://tvsen7.aynascope.net/hbo/index.m3u8  # HBO: timed out
+http://tvsen7.aynascope.net/hbo2/index.m3u8  # HBO Hits: timed out
+https://bantel-cdn1.iptvperu.tv:1936/btnscrtn/hbosignature.stream/chunks.m3u8  # HBO Signature Latin America: no such server
+http://tvsen7.aynascope.net/hgtv/index.m3u8  # HGTV: timed out
+https://jmp2.uk/plu-6582f8dadfed030008e5a93d.m3u8  # Iron Chef: not found
+https://aegis-cloudfront-1.tubi.video/475550ae-8708-46a5-a7c3-54acb3d91480/playlist.m3u8  # Johnny Carson TV: not found
+http://tvsen7.aynascope.net/laff/index.m3u8  # Laff: timed out
+https://tvsen7.aynascope.net/lifetime/index.m3u8  # Lifetime: timed out
+http://23.237.104.106:8080/USA_LMN/index.m3u8  # Lifetime Movies: not found
+https://bantel-cdn1.iptvperu.tv:1936/ZyphraCast/love-nature/chunks.m3u8  # Love Nature en Espanol: no such server
+http://23.237.104.106:8080/USA_MLB_STRIKE_ZONE/index.m3u8  # MLB Strike Zone: not found
+http://23.237.104.106:8080/USA_MSG/index.m3u8  # MSG: not found
+http://198.58.104.90:8989/mtv2/index.m3u8  # MTV2: timed out
+http://198.58.104.90:8989/natgeo/index.m3u8  # National Geographic (HD East): timed out
+http://198.58.104.90:8989/natgeowild/index.m3u8  # National Geographic Wild (HD East): timed out
+https://mdc.ott.alticeusa.net/live4.ott.optimum.net/live4-uploads/N12XH_A1/index_new.m3u8?omap=https  # News12 Bronx: timed out
+https://mdc.ott.alticeusa.net/live4.ott.optimum.net/live4-uploads/N12KH_A1/index_new.m3u8?omap=https  # News12 Brooklyn: timed out
+https://mdc.ott.alticeusa.net/live4.ott.optimum.net/live4-uploads/N12HH_A1/index_new.m3u8?omap=https  # News12 Hudson Valley: not found
+https://aegis-cloudfront-1.tubi.video/97fbb992-c212-4164-8406-abb6f731e517/playlist.m3u8  # News12 New York: not found
+https://mdc.ott.alticeusa.net/live4.ott.optimum.net/live4-uploads/N12PLUS_H_NYC_A1/index_new.m3u8  # News12+ New York: not found
+http://198.58.104.90:8989/nfl/index.m3u8  # NFL Network: timed out
+http://23.237.104.106:8080/USA_REELZ/index.m3u8  # Reelz: not found
+https://aegis-cloudfront-1.tubi.video/dfd312a3-99b3-45fe-89b2-d20579fee2e9/playlist.m3u8  # Reelz Famous & Infamous: not found
+https://linear-44.frequency.stream/dist/plex/44/hls/master/playlist.m3u8  # Revry News: no such server
+http://23.237.104.106:8080/USA_STARZ_CINEMA/index.m3u8  # Starz Cinema: not found
+http://168.228.44.241:9998/play/a0e1/index.m3u8  # Starz Encore Spanish: timed out
+https://livecdn.use1-0004.jwplive.com/live/sites/Yal8cmyO/media/fCGf6ROk/live.isml/.m3u8  # TBN: not found
+http://tvsen7.aynascope.net/teennick/index.m3u8  # TeenNick: timed out
+https://aegis-cloudfront-1.tubi.video/57c1fa3c-566b-4998-b6de-d6de67031d99/index.m3u8  # TMZ: not found
+https://jmp2.uk/plu-60fb053712f22a0007ff14d2.m3u8  # Transformers TV: not found
+https://aegis-cloudfront-1.tubi.video/c2e3094d-ad56-4c5f-9655-cd80df71fbab/playlist.m3u8  # True Crime Network (WCVB-TV): not found
+http://bantel-cdn1.iptvperu.tv:1935/btnscrtn/universalcomedy/playlist.m3u8  # Universal Comedy: no such server
+http://bantel-cdn1.iptvperu.tv:1935/btnscrtn/universalcrime/playlist.m3u8  # Universal Crime: no such server
+http://200.32.231.178/USA_NETWORK/index.m3u8  # USA Network: timed out
+https://amg00056-vevotv-vevo70saunz-samsungau-xzszd.amagi.tv/playlist/amg00056-vevotv-vevo70saunz-samsungau/playlist.m3u8  # Vevo '70s: no such server
+https://amg00056-vevotv-vevo80saunz-samsungau-rp5e3.amagi.tv/playlist/amg00056-vevotv-vevo80saunz-samsungau/playlist.m3u8  # Vevo '80s: no such server
+https://amg00056-vevotv-vevo90saunz-samsungau-n6a0d.amagi.tv/playlist/amg00056-vevotv-vevo90saunz-samsungau/playlist.m3u8  # Vevo '90s: no such server
+https://d1s6jz7jeei17.cloudfront.net/playlist/amg00056-vevotv-vevo2kau-samsungau/playlist.m3u8  # Vevo 2K: no such server
+https://amg00056-vevotv-vevocountryau-samsungau-ktmqm.amagi.tv/playlist/amg00056-vevotv-vevocountryau-samsungau/playlist.m3u8  # Vevo Country: no such server
+https://d128y56w6v2kax.cloudfront.net/playlist/amg00056-vevotv-vevopopau-samsungau/playlist.m3u8  # Vevo Pop: no such server
+https://d2lyea6if8kkz9.cloudfront.net/playlist/amg00056-vevotv-vevoretrorockau-samsungau/playlist.m3u8  # Vevo Retro Rock: no such server
+https://aegis-cloudfront-1.tubi.video/d5171dc7-f8c6-469c-81eb-e1ffaaed5721/playlist.m3u8  # Wanted: Dead or Alive: not found
+http://tvsen5.aynascope.net/willowhd/index.m3u8  # Willow: timed out
+https://pubads.g.doubleclick.net/ssai/event/tQD6w9OJQVOobcyV3Dammw/master.m3u8  # WPLG 10.1: not found
+https://2-fss-2.streamhoster.com/pl_138/amlst:201950-1309230/playlist.m3u8  # Youtoo America (KVVB-LD): not found
