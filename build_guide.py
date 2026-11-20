@@ -37,6 +37,8 @@ GRAB_SITES = ["tvpassport.com", "tvguide.com", "pluto.tv", "plex.tv", "ontvtonig
 GUIDE_URL = os.environ.get("GUIDE_URL", "guide.xml.gz")
 BEFORE, AHEAD = timedelta(hours=2), timedelta(hours=36)
 UA = {"User-Agent": "kodi-guide-builder/1.0 (+https://github.com)"}
+# listings that are only a placeholder: "No Data", "Channel No Longer Available", "teleup-event_1679249810_2590"
+PLACEHOLDER = re.compile(r"(no data|no information|channel no longer available|to be announced|[a-z-]+_\d+_\d+)\s*", re.I)
 KEEP_TAGS = ("title", "sub-title", "desc", "category", "episode-num", "icon")   # smaller for Kodi
 
 
@@ -221,6 +223,8 @@ def read_guides(sources, by_base, by_name, lo, hi):
                 keep = tid and xmltv_time(el.get("stop", "")) > lo and xmltv_time(el.get("start", "")) < hi
             except ValueError:
                 keep = False
+            if keep and PLACEHOLDER.fullmatch(el.findtext("title") or ""):
+                keep = False   # a placeholder is no listing (a channel left with none is left out)
             if not keep:
                 el.clear()
                 continue

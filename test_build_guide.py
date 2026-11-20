@@ -1,6 +1,10 @@
 """Checks for the guide builder: python3 test_build_guide.py"""
 from datetime import datetime, timedelta, timezone
-from build_guide import display_names, logo_candidates, norm, stream_lines, xmltv_time
+from build_guide import PLACEHOLDER, display_names, logo_candidates, norm, stream_lines, xmltv_time
+
+# placeholder listings are no listings
+assert all(PLACEHOLDER.fullmatch(s) for s in ("No Data", "Channel No Longer Available", "teleup-event_1679249810_2590"))
+assert not any(PLACEHOLDER.fullmatch(s) for s in ("Data", "No Data Found Here: The Movie", "3ABN Today"))
 
 # names as a TV service lists them
 assert display_names([("CNN", "HD", False), ("TNT", "West", False), ("TNT", "", True), ("ABC", "WWSB", False)]) == \
