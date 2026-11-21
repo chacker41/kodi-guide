@@ -33,6 +33,10 @@ jobs:
           GRABBED: grabbed.xml
           GUIDE_URL: https://raw.githubusercontent.com/${{ github.repository }}/output/guide.xml.gz
           LOGO_BASE: https://raw.githubusercontent.com/${{ github.repository }}/output/logos/
+      - name: Keep the channel numbers (a number, once given, stays with its channel)
+        run: |
+          git add channel_numbers.tsv
+          git diff --cached --quiet || { git -c user.name="guide bot" -c user.email="41898282+github-actions[bot]@users.noreply.github.com" commit -qm "Channel numbers $(date -u +%F)" && git push -q; }
       - name: Publish to the output branch (replaced each day, so the repository stays small)
         run: |
           cd out

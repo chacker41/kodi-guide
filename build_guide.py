@@ -23,6 +23,7 @@ from xml.sax.saxutils import escape, quoteattr
 PLAYLIST = "https://iptv-org.github.io/iptv/regions/amer.m3u"
 API = "https://iptv-org.github.io/api/"   # feeds.json (languages, feed names), channels.json (names), logos.json
 DEAD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dead_streams.txt")
+NUMBERS = os.path.join(os.path.dirname(os.path.abspath(__file__)), "channel_numbers.tsv")   # numbers once given
 REMOVED = os.path.join(os.path.dirname(os.path.abspath(__file__)), "removed_channels.txt")
 LEAVE_OUT_CATEGORIES = {"religious"}   # iptv-org categories the household does not want
 # names that say the channel is in another language ("CBS en espanol", "Telemundo", "Cine Romantico")
@@ -329,10 +330,39 @@ def plan(chans, progs):
     print(f"grab.channels.xml: {len(lines)} channels for iptv-org/epg")
 
 
-def entry(head, name, logo):
-    """The #EXTINF line with the viewer's name and the chosen logo."""
-    head = re.sub(r' tvg-(name|logo)="[^"]*"', "", head)
-    return head.replace("#EXTINF:-1", f'#EXTINF:-1 tvg-name="{name}" tvg-logo="{logo}"', 1) + "," + name
+def entry(head, name, logo, number):
+    """The #EXTINF line with the viewer's name, the chosen logo and the channel number."""
+    head = re.sub(r' tvg-(name|logo|chno)="[^"]*"', "", head)
+    return head.replace("#EXTINF:-1", f'#EXTINF:-1 tvg-chno="{number}" tvg-name="{name}" tvg-logo="{logo}"', 1) + "," + name
+
+
+# Channel numbers by kind, as a cable line-up has them: (first number, last number, iptv-org categories).
+# A channel goes in the block of its first category; categories not listed go to "more channels".
+BLOCKS = [(100, 149, {"News", "Business", "Weather"}), (200, 299, {"Sports", "Outdoor", "Auto"}),
+          (300, 399, {"Movies"}), (400, 499, {"Series"}), (500, 599, {"Classic", "Comedy"}),
+          (600, 699, {"Entertainment", "General"}), (700, 799, {"Lifestyle", "Cooking", "Travel", "Shop", "Relax", "Music"}),
+          (800, 899, {"Kids", "Animation", "Family"}), (900, 949, {"Documentary", "Education", "Science", "Culture"}),
+          (950, 999, set())]
+OVERFLOW = 1100   # past every block (the 1000s are kept for the household's own channels)
+
+
+def channel_numbers(kept, saved):
+    """{tvg-id: number}: the number a channel had before (if still in its block), else the first free one in its
+    block. saved ({tvg-id: number}) is updated in place, so a number, once given, stays with its channel."""
+    def block(head):
+        cat = (re.search(r'group-title="([^"]*)"', head) or [None, ""])[1].split(";")[0]
+        return next((b for b in BLOCKS if cat in b[2]), BLOCKS[-1])
+    taken = set(saved.values())
+    for tid, _, head, *_ in sorted(kept, key=lambda c: c[1].lower()):
+        lo, hi, _ = block(head)
+        if lo <= saved.get(tid, -1) <= hi:
+            continue
+        free = next((n for n in range(lo, hi + 1) if n not in taken), None)
+        if free is None:
+            free = next(n for n in range(OVERFLOW, 10**6) if n not in taken)
+        saved[tid] = free
+        taken.add(free)
+    return {tid: saved[tid] for tid, *_ in kept}
 
 
 def logos_by_channel():
@@ -346,7 +376,14 @@ def write_outputs(chans, progs, report, now, icons):
     kept = [c for c in chans if c[0] in progs]   # a channel with no listings anywhere is left out
     kept = [c[:4] + (name,) for c, name in zip(kept, display_names([c[4] for c in kept])) if name]
     logos = pick_logos(kept, logos_by_channel(), icons)
-    kept = [(tid, name, entry(head, name, logos[tid]), url) for tid, _, head, url, name in kept]
+    saved = {}
+    if os.path.exists(NUMBERS):
+        saved = {l.split("\t")[0]: int(l.split("\t")[1]) for l in open(NUMBERS, encoding="utf-8") if "\t" in l}
+    numbers = channel_numbers(kept, saved)
+    with open(NUMBERS, "w", encoding="utf-8") as f:
+        f.write("".join(f"{tid}\t{n}\n" for tid, n in sorted(saved.items(), key=lambda kv: kv[1])))
+    kept = sorted(((tid, name, entry(head, name, logos[tid], numbers[tid]), url) for tid, _, head, url, name in kept),
+                  key=lambda c: numbers[c[0]])
     tv = ET.Element("tv", {"generator-info-name": "kodi-guide-builder"})
     for tid, name, *_ in kept:
         ET.SubElement(ET.SubElement(tv, "channel", {"id": tid}), "display-name").text = name
