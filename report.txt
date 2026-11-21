@@ -1,0 +1,9 @@
+built 2026-11-21 03:33 UTC
+US English channels: 1231, with listings (kept): 544, left out: 687
+logos: 544 of 544
+iptv-epg.org: 223 channels, 9594 listings
+Pluto TV: 185 channels, 3450 listings
+Samsung TV Plus: 46 channels, 448 listings
+Plex: 23 channels, 684 listings
+Roku: 6 channels, 429 listings
+iptv-org/epg grab: 136 channels, 3568 listings
