@@ -25,6 +25,11 @@ API = "https://iptv-org.github.io/api/"   # feeds.json (languages, feed names), 
 DEAD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dead_streams.txt")
 REMOVED = os.path.join(os.path.dirname(os.path.abspath(__file__)), "removed_channels.txt")
 LEAVE_OUT_CATEGORIES = {"religious"}   # iptv-org categories the household does not want
+# names that say the channel is in another language ("CBS en espanol", "Telemundo", "Cine Romantico")
+NON_ENGLISH_NAME = re.compile(
+    r"[áéíóúñ¿¡ãõç]|\b(en espa[nñ]ol|espa[nñ]ol|spanish|latin|latino|latinx|latina|m[eé]xico|deportes|cine|"
+    r"novelas?|telenovelas?|crimenes|bollywood|hindi|desi|tamil|k-?pop|k\.?movies|korean|telemundo|"
+    r"univision|unimas|estrella|azteca|canela|pasiones)\b", re.I)
 LANGUAGE = "eng"
 SOURCES = [   # best first: a channel takes the first source that has it
     ("iptv-epg.org", "https://iptv-epg.org/files/epg-us.xml.gz"),
@@ -225,6 +230,10 @@ def load_channels():
         if not ch.endswith(".us") or LANGUAGE not in (feeds.get((ch, fd)) or {}).get("languages", []):
             continue
         if ch in removed or LEAVE_OUT_CATEGORIES & set((channels.get(ch) or {}).get("categories", [])):
+            continue
+        if (feeds.get((ch, fd)) or {}).get("languages", [LANGUAGE])[0] != LANGUAGE:
+            continue   # English only as a second language (an English audio track)
+        if NON_ENGLISH_NAME.search((channels.get(ch) or {}).get("name", "") + " " + line.rsplit(",", 1)[-1]):
             continue
         url = stream_lines(text, i)
         if url and url.splitlines()[-1] not in dead:

@@ -12,3 +12,4 @@ BlazeLive.us  # hard-right news
 SalemNewsChannel.us  # conservative talk (Salem Media)
 TheFirstTV.us  # hard-right news
 FoxNewsChannel.us  # conservative news (household's choice)
+MBC1USA.us  # Arabic network (English listed first)

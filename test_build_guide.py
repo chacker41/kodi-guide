@@ -1,10 +1,14 @@
 """Checks for the guide builder: python3 test_build_guide.py"""
 from datetime import datetime, timedelta, timezone
-from build_guide import PLACEHOLDER, display_names, whitened, logo_candidates, norm, stream_lines, xmltv_time
+from build_guide import NON_ENGLISH_NAME, PLACEHOLDER, display_names, whitened, logo_candidates, norm, stream_lines, xmltv_time
 
 # placeholder listings are no listings
 assert all(PLACEHOLDER.fullmatch(s) for s in ("No Data", "Channel No Longer Available", "teleup-event_1679249810_2590"))
 assert not any(PLACEHOLDER.fullmatch(s) for s in ("Data", "No Data Found Here: The Movie", "3ABN Today"))
+
+# channels named in another language are left out; English names that only look close are not
+assert all(NON_ENGLISH_NAME.search(n) for n in ("CBS en espanol", "Telemundo West", "Cine Romantico", "MTV Flow Latino", "NEW K-POP"))
+assert not any(NON_ENGLISH_NAME.search(n) for n in ("Cinemax West", "CineMoi", "Latitude TV", "Discovery Channel", "Crime 360"))
 
 # names as a TV service lists them
 assert display_names([("CNN", "HD", False), ("TNT", "West", False), ("TNT", "", True), ("ABC", "WWSB", False)]) == \
