@@ -232,8 +232,11 @@ def load_channels():
             continue
         if ch in removed or LEAVE_OUT_CATEGORIES & set((channels.get(ch) or {}).get("categories", [])):
             continue
+        # English must be the channel's PRIMARY language, not merely present as a second audio track.
+        # Distinct from the "eng in languages" check above: that one also drops channels with no
+        # languages field, whereas this default ([LANGUAGE]) would keep them — so both are needed.
         if (feeds.get((ch, fd)) or {}).get("languages", [LANGUAGE])[0] != LANGUAGE:
-            continue   # English only as a second language (an English audio track)
+            continue
         if NON_ENGLISH_NAME.search((channels.get(ch) or {}).get("name", "") + " " + line.rsplit(",", 1)[-1]):
             continue
         url = stream_lines(text, i)
