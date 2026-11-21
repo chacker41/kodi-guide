@@ -11,3 +11,4 @@ AmericasVoiceNews.us  # hard-right news
 BlazeLive.us  # hard-right news
 SalemNewsChannel.us  # conservative talk (Salem Media)
 TheFirstTV.us  # hard-right news
+FoxNewsChannel.us  # conservative news (household's choice)
