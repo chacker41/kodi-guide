@@ -23,6 +23,8 @@ from xml.sax.saxutils import escape, quoteattr
 PLAYLIST = "https://iptv-org.github.io/iptv/regions/amer.m3u"
 API = "https://iptv-org.github.io/api/"   # feeds.json (languages, feed names), channels.json (names), logos.json
 DEAD = os.path.join(os.path.dirname(os.path.abspath(__file__)), "dead_streams.txt")
+REMOVED = os.path.join(os.path.dirname(os.path.abspath(__file__)), "removed_channels.txt")
+LEAVE_OUT_CATEGORIES = {"religious"}   # iptv-org categories the household does not want
 LANGUAGE = "eng"
 SOURCES = [   # best first: a channel takes the first source that has it
     ("iptv-epg.org", "https://iptv-epg.org/files/epg-us.xml.gz"),
@@ -181,6 +183,13 @@ def pick_logos(kept, logos, icons):
         return dict(ex.map(one, kept))
 
 
+def removed_channels():
+    """iptv-org channel ids left out by choice, from removed_channels.txt."""
+    if not os.path.exists(REMOVED):
+        return set()
+    return {l.split()[0] for l in open(REMOVED, encoding="utf-8") if l.strip() and not l.startswith("#")}
+
+
 def dead_streams():
     """Stream addresses found dead (not found, timed out, no such server), from dead_streams.txt."""
     if not os.path.exists(DEAD):
@@ -207,13 +216,15 @@ def load_channels():
     feeds = {(f["channel"], f["id"]): f for f in json.loads(fetch(API + "feeds.json"))}
     channels = {c["id"]: c for c in json.loads(fetch(API + "channels.json"))}
     text = fetch(PLAYLIST).decode("utf-8", "replace").splitlines()
-    dead, found = dead_streams(), []
+    dead, removed, found = dead_streams(), removed_channels(), []
     for i, line in enumerate(text):
         if not line.startswith("#EXTINF") or i + 1 >= len(text):
             continue
         tid = (re.search(r'tvg-id="([^"]*)"', line) or [None, ""])[1]
         ch, _, fd = tid.partition("@")
         if not ch.endswith(".us") or LANGUAGE not in (feeds.get((ch, fd)) or {}).get("languages", []):
+            continue
+        if ch in removed or LEAVE_OUT_CATEGORIES & set((channels.get(ch) or {}).get("categories", [])):
             continue
         url = stream_lines(text, i)
         if url and url.splitlines()[-1] not in dead:

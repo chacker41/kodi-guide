@@ -1,0 +1,13 @@
+# Channels left out of us.m3u by choice: an iptv-org channel id (every feed of it), then a comment.
+# Channels iptv-org files under "religious" are left out as well (build_guide.py), so they need no line here.
+TBNArmenia.us  # religious, not in iptv-org's religious category
+NewsmaxTV.us  # hard-right news
+Newsmax2.us  # hard-right news
+OneAmericaNewsNetwork.us  # hard-right news
+OANPlus.us  # hard-right news
+RealAmericasVoice.us  # hard-right news
+AmericasVoice.us  # hard-right news
+AmericasVoiceNews.us  # hard-right news
+BlazeLive.us  # hard-right news
+SalemNewsChannel.us  # conservative talk (Salem Media)
+TheFirstTV.us  # hard-right news
