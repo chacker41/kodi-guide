@@ -166,15 +166,15 @@ def whitened(data):
 
 
 def logo_rank(data):
-    """How good a logo looks on a TV: see-through PNG first, then the larger (up to 1200 px). Without Pillow
-    every logo ranks the same, so the first that loads wins."""
+    """How good a logo looks on a TV: big enough to be sharp (up to 400 px) first, then see-through, PNG, and the
+    larger (up to 1200 px). Without Pillow every logo ranks the same, so the first that loads wins."""
     try:
         from PIL import Image
         im = Image.open(io.BytesIO(data))
         clear = im.mode in ("RGBA", "LA", "PA") or (im.mode == "P" and "transparency" in im.info)
-        return clear, im.format == "PNG", min(max(im.size), 1200)
+        return min(max(im.size), 400), clear, im.format == "PNG", min(max(im.size), 1200)
     except Exception:
-        return False, False, 0
+        return 0, False, False, 0
 
 
 def tv_logos():
@@ -207,8 +207,8 @@ def pick_logos(kept, logos, icons):
                 rank = (light,) + logo_rank(data)
                 if best is None or rank > best[0]:
                     best = (rank, u, data)
-        if not best:
-            return c[0], ""
+        if not best:   # nothing answered (Wikimedia refuses bursts): the top candidate, for players to try later
+            return c[0], next((u for u, light in urls if u and light), "")
         white = whitened(best[2])
         if not white:
             return c[0], best[1]

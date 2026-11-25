@@ -69,13 +69,15 @@ except ImportError:
     print("Pillow not installed: white logos not checked")
 print("ok")
 
-try:   # a see-through PNG beats a bigger JPEG; between see-through PNGs, the bigger wins
+try:   # sharp enough first (400 px), then see-through, then bigger
     from PIL import Image
     def img(size, fmt, mode):
         b = io.BytesIO(); Image.new(mode, size).save(b, fmt); return b.getvalue()
-    clear_small, clear_big, jpeg_big = img((300, 300), "PNG", "RGBA"), img((900, 400), "PNG", "RGBA"), img((1600, 900), "JPEG", "RGB")
-    assert logo_rank(clear_small) > logo_rank(jpeg_big)
-    assert logo_rank(clear_big) > logo_rank(clear_small)
-    assert logo_rank(b"not a picture") == (False, False, 0)
+    tiny, clear, clear_big = img((95, 70), "PNG", "RGBA"), img((576, 288), "PNG", "RGBA"), img((900, 400), "PNG", "RGBA")
+    jpeg_mid, jpeg_big = img((325, 183), "JPEG", "RGB"), img((1600, 900), "JPEG", "RGB")
+    assert logo_rank(clear) > logo_rank(jpeg_big)      # sharp enough either way: see-through wins
+    assert logo_rank(jpeg_mid) > logo_rank(tiny)       # a postage stamp loses, even see-through
+    assert logo_rank(clear_big) > logo_rank(clear)
+    assert logo_rank(b"not a picture") == (0, False, False, 0)
 except ImportError:
     print("Pillow not installed: logo_rank checks skipped")
