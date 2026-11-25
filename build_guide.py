@@ -15,7 +15,7 @@ iptv-org's own grabber fetched for the rest. Only channels with listings are kep
                                 (GRABBED: the grabber's guide.xml, read as one more source)
 Standard library only, plus Pillow (optional) for white copies of black logos. Run daily (GitHub Actions: .github/workflows/guide.yml).
 """
-import glob, gzip, io, json, os, re, sys, time, urllib.error, urllib.request, xml.etree.ElementTree as ET
+import contextlib, glob, gzip, io, json, os, re, sys, threading, time, urllib.error, urllib.request, xml.etree.ElementTree as ET
 from concurrent.futures import ThreadPoolExecutor
 from datetime import datetime, timedelta, timezone
 from xml.sax.saxutils import escape, quoteattr
@@ -124,12 +124,16 @@ def logo_candidates(tid, logos):
     return [(u, rank[0]) for rank, u in sorted(found, key=lambda x: x[0], reverse=True)]
 
 
-def image_bytes(url, tries=3):
+WIKIMEDIA = threading.Semaphore(2)   # Wikimedia refuses bursts (429): two at a time
+
+
+def image_bytes(url, tries=5):
     """The picture at url, or None when it does not answer with one (a deleted imgur picture answers
     with its removed.png). Wikimedia refuses bursts (429), so a refusal is tried again after a pause."""
     for n in range(tries):
         try:
-            with urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=20) as r:
+            with WIKIMEDIA if "wikimedia.org" in url else contextlib.nullcontext(), \
+                    urllib.request.urlopen(urllib.request.Request(url, headers=UA), timeout=20) as r:
                 ok = r.headers.get_content_type().startswith("image/") and "removed" not in r.geturl()
                 return r.read() if ok else None
         except urllib.error.HTTPError as e:
