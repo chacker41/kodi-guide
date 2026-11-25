@@ -10,9 +10,9 @@ those have are grabbed with [iptv-org/epg](https://github.com/iptv-org/epg) (tvt
 others). Channels with no listings anywhere are left out.
 
 Names follow a TV service's line-up: one entry per network under its brand ("CNN", not "CNN (HD)"),
-West feeds as "TNT West". Each channel's logo is the best one in iptv-org's logo database that
-loads (no black or dark versions, transparent PNG first, then the largest; Wikimedia SVGs as 960 px
-PNGs), else the guides' own channel icon. Streams found dead from a home connection are listed in
+West feeds as "TNT West". Each channel's logo is the best-looking one that loads from iptv-org's logo database,
+every guide's own channel icon and [tv-logo/tv-logos](https://github.com/tv-logo/tv-logos): no black or
+dark versions, a transparent PNG first, then the largest (Wikimedia SVGs as 960 px PNGs). Streams found dead from a home connection are listed in
 `dead_streams.txt` and left out. A GitHub Action runs it every morning
 and publishes to the `output` branch:
 

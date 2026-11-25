@@ -1,6 +1,6 @@
 """Checks for the guide builder: python3 test_build_guide.py"""
 from datetime import datetime, timedelta, timezone
-from build_guide import NON_ENGLISH_NAME, PLACEHOLDER, channel_numbers, display_names, whitened, logo_candidates, norm, stream_lines, xmltv_time
+from build_guide import NON_ENGLISH_NAME, PLACEHOLDER, channel_numbers, display_names, whitened, logo_candidates, logo_rank, norm, stream_lines, xmltv_time
 
 # placeholder listings are no listings
 assert all(PLACEHOLDER.fullmatch(s) for s in ("No Data", "Channel No Longer Available", "teleup-event_1679249810_2590"))
@@ -34,6 +34,7 @@ logos = {"X.us": [
     {"feed": None, "format": "SVG", "width": 100, "tags": [], "url": "https://upload.wikimedia.org/wikipedia/commons/d/df/X_logo.svg"},
     {"feed": "Other", "format": "PNG", "width": 900, "tags": [], "url": "https://a/other-feed.png"},
     {"feed": None, "format": "GIF", "width": 900, "tags": [], "url": "https://a/x.gif"}]}
+assert [light for _, light in logo_candidates("X.us@SD", logos)] == [True, True, True, False]
 assert [u for u, _ in logo_candidates("X.us@SD", logos)] == [
     "https://upload.wikimedia.org/wikipedia/commons/thumb/d/df/X_logo.svg/960px-X_logo.svg.png",
     "https://a/small.png", "https://a/big.jpg", "https://a/black.png"]
@@ -67,3 +68,14 @@ try:
 except ImportError:
     print("Pillow not installed: white logos not checked")
 print("ok")
+
+try:   # a see-through PNG beats a bigger JPEG; between see-through PNGs, the bigger wins
+    from PIL import Image
+    def img(size, fmt, mode):
+        b = io.BytesIO(); Image.new(mode, size).save(b, fmt); return b.getvalue()
+    clear_small, clear_big, jpeg_big = img((300, 300), "PNG", "RGBA"), img((900, 400), "PNG", "RGBA"), img((1600, 900), "JPEG", "RGB")
+    assert logo_rank(clear_small) > logo_rank(jpeg_big)
+    assert logo_rank(clear_big) > logo_rank(clear_small)
+    assert logo_rank(b"not a picture") == (False, False, 0)
+except ImportError:
+    print("Pillow not installed: logo_rank checks skipped")

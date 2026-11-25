@@ -46,6 +46,8 @@ GUIDE_URL = os.environ.get("GUIDE_URL", "guide.xml.gz")
 LOGO_BASE = os.environ.get("LOGO_BASE", "logos/")   # where out/logos is published (white copies of black logos)
 DARK_LOGO = 30   # average brightness (0-255) of a logo's drawn pixels below which it is made white
 BEFORE, AHEAD = timedelta(hours=2), timedelta(hours=36)
+TV_LOGOS_LIST = "https://api.github.com/repos/tv-logo/tv-logos/git/trees/main?recursive=1"
+TV_LOGOS_RAW = "https://raw.githubusercontent.com/tv-logo/tv-logos/main/"
 UA = {"User-Agent": "kodi-guide-builder/1.0 (+https://github.com)"}
 # listings that are only a placeholder: "No Data", "Channel No Longer Available", "teleup-event_1679249810_2590"
 PLACEHOLDER = re.compile(r"(no data|no information|channel no longer available|to be announced|[a-z-]+_\d+_\d+)\s*", re.I)
@@ -103,7 +105,7 @@ def display_names(entries):
 
 def logo_candidates(tid, logos):
     """iptv-org's logos for the channel that Kodi can draw, best first: no black or dark versions (lost on a
-    dark screen), transparent before JPEG, then the largest: [(url, width)]. A Wikimedia SVG comes as its 960 px PNG."""
+    dark screen), transparent before JPEG, then the largest: [(url, not dark)]. A Wikimedia SVG comes as its 960 px PNG."""
     ch, _, fd = tid.partition("@")
     found = []
     for l in logos.get(ch, []):
@@ -119,7 +121,7 @@ def logo_candidates(tid, logos):
             continue
         dark = bool(set(l.get("tags") or []) & {"black", "dark"})
         found.append(((not dark, fmt != "JPEG", min(width, 1200), bool(l.get("in_use"))), url))
-    return [(u, rank[2]) for rank, u in sorted(found, key=lambda x: x[0], reverse=True)]
+    return [(u, rank[0]) for rank, u in sorted(found, key=lambda x: x[0], reverse=True)]
 
 
 def image_bytes(url, tries=3):
@@ -163,28 +165,57 @@ def whitened(data):
     return out.getvalue()
 
 
+def logo_rank(data):
+    """How good a logo looks on a TV: see-through PNG first, then the larger (up to 1200 px). Without Pillow
+    every logo ranks the same, so the first that loads wins."""
+    try:
+        from PIL import Image
+        im = Image.open(io.BytesIO(data))
+        clear = im.mode in ("RGBA", "LA", "PA") or (im.mode == "P" and "transparency" in im.info)
+        return clear, im.format == "PNG", min(max(im.size), 1200)
+    except Exception:
+        return False, False, 0
+
+
+def tv_logos():
+    """tv-logo/tv-logos' US logos (large see-through PNGs) by normalized channel name: {name: url}."""
+    token = os.environ.get("GITHUB_TOKEN")   # GitHub allows 60 unsigned API calls an hour per address
+    try:
+        req = urllib.request.Request(TV_LOGOS_LIST, headers={**UA, **({"Authorization": f"Bearer {token}"} if token else {})})
+        with urllib.request.urlopen(req, timeout=60) as r:
+            paths = [t["path"] for t in json.load(r)["tree"]]
+    except Exception:
+        return {}
+    return {norm(p.split("/")[-1][:-len("-us.png")]): TV_LOGOS_RAW + p
+            for p in paths if p.startswith("countries/united-states/") and p.endswith("-us.png")}
+
+
 def pick_logos(kept, logos, icons):
-    """The first logo that loads for each kept channel: iptv-org's, then the guides' icon, then the
-    playlist's own; a black one as its white copy in out/logos: {tvg-id: url or ""}."""
+    """The best-looking logo that loads for each kept channel (logo_rank), from iptv-org's, the guides' icons,
+    tv-logos and the playlist's own (a dark-tagged iptv-org logo only when nothing else loads); a black one
+    as its white copy in out/logos: {tvg-id: url or ""}."""
     os.makedirs("out/logos", exist_ok=True)
+    named = tv_logos()
 
     def one(c):
         own = (re.search(r'tvg-logo="([^"]*)"', c[2]) or [None, ""])[1]
-        found = logo_candidates(c[0], logos)
-        urls = [u for u, _ in found]
-        # a small catalog logo (an old upload) loses to the guide's own icon, which is usually large
-        urls = [icons.get(c[0])] + urls if found and found[0][1] < 300 else urls + [icons.get(c[0])]
-        for u in urls + [own]:
-            data = u and image_bytes(u)
+        urls = logo_candidates(c[0], logos) + [(u, True) for u in icons.get(c[0], []) + [named.get(norm(c[4])), own]]
+        best = None
+        for u, light in dict.fromkeys((u, light) for u, light in urls if u):
+            data = image_bytes(u)
             if data:
-                white = whitened(data)
-                if not white:
-                    return c[0], u
-                name = re.sub(r"[^A-Za-z0-9.@-]", "_", c[0]) + ".png"
-                with open(os.path.join("out/logos", name), "wb") as f:
-                    f.write(white)
-                return c[0], LOGO_BASE + name
-        return c[0], ""
+                rank = (light,) + logo_rank(data)
+                if best is None or rank > best[0]:
+                    best = (rank, u, data)
+        if not best:
+            return c[0], ""
+        white = whitened(best[2])
+        if not white:
+            return c[0], best[1]
+        name = re.sub(r"[^A-Za-z0-9.@-]", "_", c[0]) + ".png"
+        with open(os.path.join("out/logos", name), "wb") as f:
+            f.write(white)
+        return c[0], LOGO_BASE + name
     with ThreadPoolExecutor(16) as ex:
         return dict(ex.map(one, kept))
 
@@ -276,7 +307,7 @@ def read_guides(sources, by_base, by_name, lo, hi):
                     here[sid] = tid
                 icon = el.find("icon")
                 if tid and icon is not None and icon.get("src"):
-                    icons.setdefault(tid, icon.get("src"))
+                    icons.setdefault(tid, []).append(icon.get("src"))
                 el.clear()
                 continue
             if el.tag != "programme":

@@ -33,6 +33,7 @@ jobs:
           GRABBED: grabbed.xml
           GUIDE_URL: https://raw.githubusercontent.com/${{ github.repository }}/output/guide.xml.gz
           LOGO_BASE: https://raw.githubusercontent.com/${{ github.repository }}/output/logos/
+          GITHUB_TOKEN: ${{ github.token }}   # lists tv-logo/tv-logos (60 unsigned calls an hour is shared by all runners)
       - name: Keep the channel numbers (a number, once given, stays with its channel)
         run: |
           git add channel_numbers.tsv
